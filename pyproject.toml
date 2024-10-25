@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deno"
+version = "2.1.4"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.hatch.build]
+artifacts = ["scripts/hatch_build.py"]
+
+[tool.hatch.build.hooks.custom]
+path = "scripts/hatch_build.py"
