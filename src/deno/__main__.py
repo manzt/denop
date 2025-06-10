@@ -24,7 +24,7 @@ def _detect_virtualenv() -> str:
 
 
 def _run() -> None:
-    uv = os.fsdecode(find_deno_bin())
+    deno = os.fsdecode(find_deno_bin())
 
     env = os.environ.copy()
     venv = _detect_virtualenv()
@@ -34,10 +34,10 @@ def _run() -> None:
     if sys.platform == "win32":
         import subprocess
 
-        completed_process = subprocess.run([uv, *sys.argv[1:]], env=env)
+        completed_process = subprocess.run([deno, *sys.argv[1:]], env=env)
         sys.exit(completed_process.returncode)
     else:
-        os.execvpe(uv, [uv, *sys.argv[1:]], env=env)
+        os.execvpe(deno, [deno, *sys.argv[1:]], env=env)
 
 
 if __name__ == "__main__":
