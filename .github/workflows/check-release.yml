@@ -1,0 +1,55 @@
+name: Check Release
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight UTC
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Check for new Deno version
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get latest Deno version
+          NEW_VERSION=$(gh release view --repo denoland/deno --json tagName --jq '.tagName' | sed 's/^v//')
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          # Set the version
+          uv version "$NEW_VERSION"
+          # Check if there are changes
+          if git diff --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes needed"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "New version available: $NEW_VERSION"
+          fi
+
+      - name: Create PR
+        if: steps.check.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+
+          BRANCH="update-deno-$VERSION"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "Update to Deno $VERSION"
+          git push -u origin "$BRANCH"
+
+          gh pr create \
+            --title "Update to Deno $VERSION" \
+            --body "Automated update from Deno release v$VERSION"
