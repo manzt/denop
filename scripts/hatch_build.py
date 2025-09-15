@@ -71,7 +71,11 @@ class CustomHook(BuildHookInterface):
             return
 
         zname = resolve_deno_archive_name()
-        deno = download_deno_bin(Path(self.directory), self.metadata.version, zname)
+        deno = download_deno_bin(
+            Path(self.directory),
+            os.environ.get("DENO_VERSION", self.metadata.version),
+            zname,
+        )
         build_data["tag"] = binary_to_tag[zname]
         build_data["shared_scripts"][str(deno.absolute())] = f"src/{deno.name}"
 
