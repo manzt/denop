@@ -1,21 +1,51 @@
-# denop
+# Deno
 
 Distribution of [Deno](https://deno.com/) for PyPI.
 
-```sh
-scripts/build.sh # build all the distributions under ./dist
-uvx --from dist/deno-2.3.5-py3-none-macosx_11_0_arm64.whl deno --version
-# deno 2.3.5 (stable, release, aarch64-apple-darwin)
-# v8 13.7.152.6-rusty
-# typescript 5.8.3
+## Installation
+
+```bash
+pip install deno
 ```
 
-```py
-$ uv run --with dist/deno-2.3.5-py3-none-macosx_11_0_arm64.whl python
-# Python 3.13.3 (main, May 30 2025, 05:45:55) [Clang 20.1.4 ] on darwin
-# Type "help", "copyright", "credits" or "license" for more information.
-# >>> import deno
-# >>> deno.find_deno_bin()
-# '/Users/manzt/.cache/uv/archive-v0/BykgqI7nUKj0T27s79pu3/bin/deno'
-# >>>
+```bash
+uv add deno
 ```
+
+## Usage
+
+### Command Line
+
+You can invoke Deno CLI directly via `uv` or `pipx`:
+
+```bash
+uvx deno --version
+```
+
+```bash
+pipx deno --version
+```
+
+### Python API
+
+```python
+import deno
+
+# Get the path to the Deno executable
+deno_bin = deno.find_deno_bin()
+```
+
+## Platform Support
+
+This package provides Deno binaries for:
+- macOS (`x86_64`, `arm64`)
+- Linux (`x86_64`, `arm64`)
+- Windows (`x86_64`)
+
+The appropriate binary for your platform will be installed automatically.
+
+## License
+
+MIT
+
+This repository redistributes official Deno binaries to make them easily installable via pip/uv/etc.
