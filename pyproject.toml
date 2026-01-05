@@ -1,6 +1,6 @@
 [project]
 name = "deno"
-version = "2.6.3"
+version = "2.6.4"
 description = "Python redistribution of Deno binaries"
 readme = "README.md"
 requires-python = ">=3.10"
