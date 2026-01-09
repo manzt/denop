@@ -104,6 +104,6 @@ jobs:
 
           gh pr create \
             --title "v$NEW_VERSION" \
-            --body "Automated $BUMP_TYPE version bump to v$NEW_VERSION. After merging this PR, run the `Release` workflow." \
+            --body "Automated $BUMP_TYPE version bump to v$NEW_VERSION. After merging this PR, run the 'Release' workflow." \
             --base main \
             --head "$BRANCH_NAME"
