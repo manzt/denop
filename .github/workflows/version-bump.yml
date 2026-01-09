@@ -1,0 +1,109 @@
+name: Version Bump
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(grep -oP '(?<=version = ")[^"]+' pyproject.toml | head -1)
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+
+      - name: Calculate new version
+        id: new_version
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
+          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+
+          case $BUMP_TYPE in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          NEW_VERSION="$major.$minor.$patch"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+
+      - name: Update pyproject.toml
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" pyproject.toml
+
+      - name: Update uv.lock
+        run: |
+          CURRENT_VERSION="${{ steps.current_version.outputs.version }}"
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" uv.lock
+
+      - name: Configure Git
+        run: |
+          git config user.name "denobot"
+          git config user.email "denobot@users.noreply.github.com"
+
+      - name: Create branch and commit
+        id: commit
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          BRANCH_NAME="version-bump-v$NEW_VERSION"
+
+          git checkout -b "$BRANCH_NAME"
+          git add pyproject.toml uv.lock
+          git commit -m "v$NEW_VERSION"
+          git push origin "$BRANCH_NAME"
+
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.DENOBOT_PAT }}
+        run: |
+          NEW_VERSION="${{ steps.new_version.outputs.version }}"
+          BRANCH_NAME="${{ steps.commit.outputs.branch }}"
+          BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+
+          gh pr create \
+            --title "v$NEW_VERSION" \
+            --body "Automated $BUMP_TYPE version bump to v$NEW_VERSION. After merging this PR, run the `Release` workflow." \
+            --base main \
+            --head "$BRANCH_NAME"
