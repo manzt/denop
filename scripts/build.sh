@@ -1,4 +1,7 @@
-# Build the main
+#!/bin/bash
+set -exuo pipefail
+
+# Build the source distribution tarball
 uv build --sdist
 
 # Build the wheels
