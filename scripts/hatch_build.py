@@ -2,6 +2,7 @@ import urllib.request
 import zipfile
 import platform
 import os
+import stat
 from pathlib import Path
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
@@ -51,9 +52,15 @@ def download_deno_bin(dir: Path, version: str, zname: str) -> Path:
     with zipfile.ZipFile(dir / zname, "r") as zf:
         for fname in zf.namelist():
             if fname in ("deno", "deno.exe"):
-                with (dir / fname).open("wb") as out_file:
+                out_path = dir / fname
+                with out_path.open("wb") as out_file:
                     out_file.write(zf.read(fname))
-            return dir / fname
+                # Set executable permission bit
+                out_stat = out_path.stat()
+                out_path.chmod(
+                    out_stat.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+                )
+                return out_path
 
     raise FileNotFoundError("Binary 'deno' not found in archive.")
 
