@@ -1,3 +1,4 @@
+import contextlib
 import urllib.request
 import zipfile
 import platform
@@ -9,24 +10,30 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 SELF_DIR = Path(__file__).parent
 
+# see https://github.com/denoland/deno/issues/30432
+MIN_SUPPORTED_GLIBC = (2, 27)
+MIN_GLIBC_STR = "_".join(map(str, MIN_SUPPORTED_GLIBC))
+
 # these are the binaries provided by deno, mapped to a python tag
 binary_to_tag = {
     "deno-x86_64-apple-darwin.zip": "py3-none-macosx_10_12_x86_64",
     "deno-aarch64-apple-darwin.zip": "py3-none-macosx_11_0_arm64",
-    "deno-aarch64-unknown-linux-gnu.zip": "py3-none-manylinux_2_17_aarch64",
+    "deno-aarch64-unknown-linux-gnu.zip": f"py3-none-manylinux_{MIN_GLIBC_STR}_aarch64",
     "deno-x86_64-pc-windows-msvc.zip": "py3-none-win_amd64",
-    "deno-x86_64-unknown-linux-gnu.zip": "py3-none-manylinux_2_17_x86_64",
+    "deno-x86_64-unknown-linux-gnu.zip": f"py3-none-manylinux_{MIN_GLIBC_STR}_x86_64",
+}
+
+SUPPORTED_PLATFORMS = {
+    "darwin": ("apple-darwin", {"x86_64", "aarch64"}),
+    "linux": ("unknown-linux-gnu", {"x86_64", "aarch64"}),
+    "windows": ("pc-windows-msvc", {"x86_64"}),
 }
 
 
 def detect_platform() -> tuple[str, str]:
     """Detect the platform and architecture."""
     system = platform.system().lower()
-    os_name = {
-        "darwin": "apple-darwin",
-        "linux": "unknown-linux-gnu",
-        "windows": "pc-windows-msvc",
-    }.get(system)
+    os_name, supported_arch = SUPPORTED_PLATFORMS.get(system, (None, None))
     if not os_name:
         raise RuntimeError(f"Unsupported OS: {system}")
 
@@ -35,8 +42,20 @@ def detect_platform() -> tuple[str, str]:
         arch = "x86_64"
     elif arch in {"aarch64", "arm64"}:
         arch = "aarch64"
-    else:
+    if arch not in supported_arch:
         raise RuntimeError(f"Unsupported architecture: {arch}")
+
+    if system == "linux":
+        libc_ver = None
+        with contextlib.suppress(OSError):
+            libc_ver = platform.libc_ver()
+        if not isinstance(libc_ver, tuple) or "glibc" not in libc_ver:
+            raise RuntimeError("Non-glibc Linux platforms are unsupported")
+        version_tuple = tuple(map(int, libc_ver[1].split(".")[:2]))
+        if version_tuple < MIN_SUPPORTED_GLIBC:
+            raise RuntimeError(
+                f"The minimum supported version of glibc is {MIN_GLIBC_STR}"
+            )
 
     return os_name, arch
 
