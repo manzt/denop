@@ -1,4 +1,6 @@
 import contextlib
+import hashlib
+import re
 import urllib.request
 import zipfile
 import platform
@@ -65,8 +67,20 @@ def download_deno_bin(dir: Path, version: str, zname: str) -> Path:
     assert zname in binary_to_tag, f"Unsupported binary: {zname}"
     url = f"https://github.com/denoland/deno/releases/download/v{version}/{zname}"
 
+    with urllib.request.urlopen(f"{url}.sha256sum") as resp:
+        sum_text = resp.read().decode()
+
+    match = re.search(r"[0-9A-Fa-f]{64}", sum_text)
+    if not match:
+        raise RuntimeError(f"Unable to verify integrity of {zname}")
+    expected_hash = match.group(0).lower()
+
     with urllib.request.urlopen(url) as resp, (dir / zname).open("wb") as out_file:
-        out_file.write(resp.read())
+        data = resp.read()
+        hexdigest = hashlib.new("sha256", data).hexdigest()
+        if hexdigest != expected_hash:
+            raise RuntimeError(f"{zname} hash mismatch: {hexdigest} != {expected_hash}")
+        out_file.write(data)
 
     with zipfile.ZipFile(dir / zname, "r") as zf:
         for fname in zf.namelist():
