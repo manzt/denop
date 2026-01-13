@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import hashlib
 import re
 import urllib.request
@@ -12,6 +13,7 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 
 SELF_DIR = Path(__file__).parent
+CHUNK_SIZE = 1 << 17
 
 # see https://github.com/denoland/deno/issues/30432
 MIN_SUPPORTED_GLIBC = (2, 27)
@@ -76,11 +78,16 @@ def download_deno_bin(dir: Path, version: str, zname: str) -> Path:
     expected_hash = match.group(0).lower()
 
     with urllib.request.urlopen(url) as resp, (dir / zname).open("wb") as out_file:
-        data = resp.read()
-        hexdigest = hashlib.new("sha256", data).hexdigest()
+        reader = functools.partial(resp.read, CHUNK_SIZE)
+        hasher = hashlib.sha256()
+
+        for chunk in iter(reader, b""):
+            out_file.write(chunk)
+            hasher.update(chunk)
+
+        hexdigest = hasher.hexdigest()
         if hexdigest != expected_hash:
             raise RuntimeError(f"{zname} hash mismatch: {hexdigest} != {expected_hash}")
-        out_file.write(data)
 
     with zipfile.ZipFile(dir / zname, "r") as zf:
         for fname in zf.namelist():
