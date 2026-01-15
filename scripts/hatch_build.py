@@ -1,4 +1,7 @@
 import contextlib
+import functools
+import hashlib
+import re
 import urllib.request
 import zipfile
 import platform
@@ -10,6 +13,7 @@ from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
 
 SELF_DIR = Path(__file__).parent
+CHUNK_SIZE = 1 << 17
 
 # see https://github.com/denoland/deno/issues/30432
 MIN_SUPPORTED_GLIBC = (2, 27)
@@ -65,8 +69,25 @@ def download_deno_bin(dir: Path, version: str, zname: str) -> Path:
     assert zname in binary_to_tag, f"Unsupported binary: {zname}"
     url = f"https://github.com/denoland/deno/releases/download/v{version}/{zname}"
 
+    with urllib.request.urlopen(f"{url}.sha256sum") as resp:
+        sum_text = resp.read().decode()
+
+    match = re.search(r"[0-9A-Fa-f]{64}", sum_text)
+    if not match:
+        raise RuntimeError(f"Unable to verify integrity of {zname}")
+    expected_hash = match.group(0).lower()
+
     with urllib.request.urlopen(url) as resp, (dir / zname).open("wb") as out_file:
-        out_file.write(resp.read())
+        reader = functools.partial(resp.read, CHUNK_SIZE)
+        hasher = hashlib.sha256()
+
+        for chunk in iter(reader, b""):
+            out_file.write(chunk)
+            hasher.update(chunk)
+
+        hexdigest = hasher.hexdigest()
+        if hexdigest != expected_hash:
+            raise RuntimeError(f"{zname} hash mismatch: {hexdigest} != {expected_hash}")
 
     with zipfile.ZipFile(dir / zname, "r") as zf:
         for fname in zf.namelist():
